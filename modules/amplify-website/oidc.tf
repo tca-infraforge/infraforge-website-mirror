@@ -56,14 +56,14 @@ resource "aws_iam_role_policy" "oidc_policy" {
           "logs:PutLogEvents",
           "iam:PassRole"
         ],
-        Resource = [
+        Resource = compact([
           local.amplify_app_arn,
           local.s3_bucket_arn,
           local.cloudfront_dist_arn,
           local.lambda_arn,
           local.logs_arn,
           var.config.iam_role_arn
-        ]
+        ])
       }
     ]
   })

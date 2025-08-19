@@ -1,3 +1,8 @@
+variable "oauth_token" {
+  description = "GitHub Personal Access Token for Amplify"
+  type        = string
+  sensitive   = true
+}
 variable "config" {
   description = "Global configuration block"
   type = object({

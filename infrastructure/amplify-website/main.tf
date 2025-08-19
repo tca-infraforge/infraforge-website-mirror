@@ -1,3 +1,8 @@
+variable "oauth_token" {
+  description = "GitHub Personal Access Token for Amplify"
+  type        = string
+  sensitive   = true
+}
 # IAM Role for Amplify (created inside same AWS account)
 resource "aws_iam_role" "amplify" {
   name = "${var.config.app_name}-amplify-role"
@@ -45,7 +50,7 @@ resource "aws_amplify_app" "this" {
   name                 = var.config.app_name
   repository           = var.config.repo_url
   platform             = "WEB"
-  access_token         = var.config.oauth_token
+  access_token         = var.oauth_token
   iam_service_role_arn = aws_iam_role.amplify.arn
 
   environment_variables = {

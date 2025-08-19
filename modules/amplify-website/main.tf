@@ -19,17 +19,20 @@ resource "aws_amplify_app" "this" {
   name                     = var.config.app_name
   repository               = var.config.repo_url
   platform                 = "WEB"
+  access_token             = var.oauth_token
   enable_branch_auto_build = true
   environment_variables = {
-    OIDC_TOKEN = var.config.oauth_token
-    # Add other required variables here
+    REACT_APP_API_URL        = var.config.form_backend_api_url
+    REACT_APP_API_SECRET_KEY = var.config.app_api_secret_key
   }
+  build_spec = fileexists("${path.module}/../../buildspec.yml") ? file("${path.module}/../../buildspec.yml") : null
   tags = var.config.tags
 }
 
 # CloudFront Distribution for fallback/testing
 resource "aws_cloudfront_distribution" "fallback" {
-  enabled = var.config.enable_cloudfront
+  count = 0 # Disabled fallback CloudFront distribution for now
+  enabled = false
   origin {
     domain_name = aws_amplify_app.this.default_domain
     origin_id   = "amplify-app-origin"
@@ -55,7 +58,7 @@ resource "aws_cloudfront_distribution" "fallback" {
 locals {
   amplify_app_arn       = aws_amplify_app.this.arn
   s3_bucket_arn         = "arn:aws:s3:::${var.config.tf_state_bucket}"
-  cloudfront_dist_arn   = aws_cloudfront_distribution.fallback.arn
+  cloudfront_dist_arn   = length(aws_cloudfront_distribution.fallback) > 0 ? aws_cloudfront_distribution.fallback[0].arn : null
   lambda_arn            = "arn:aws:lambda:${var.config.aws_region}:*:function:*"
   logs_arn              = "arn:aws:logs:${var.config.aws_region}:*:log-group:*"
   codebuild_project_arn = "arn:aws:codebuild:${var.config.aws_region}:*:project:*"

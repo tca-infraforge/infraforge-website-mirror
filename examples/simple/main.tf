@@ -54,8 +54,9 @@ locals {
 # 4) Amplify website (single object)
 # ---------------------------------------
 module "amplify_website" {
-  source = "../../modules/amplify-website"
-  config = local.full_config
+  source      = "../../modules/amplify-website"
+  config      = local.full_config
+  oauth_token = var.config.oauth_token
 }
 
 # ---------------------------------------

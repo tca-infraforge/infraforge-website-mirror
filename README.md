@@ -13,7 +13,6 @@ For onboarding, team training, and company records, see the guides above for:
 - Team Git workflow for OIDC/GitHub/Amplify integration
 - Alternative GitHub sync solutions
 
-<<<<<<< HEAD
 # infraforge Infrastructure Project
 
 This project deploys a secure, enterprise-grade web application using AWS Amplify, CloudFront, and Terraform, integrated with OIDC-enabled CI/CD, enhanced with budgeting, form backend, monitoring, and OIDC.
