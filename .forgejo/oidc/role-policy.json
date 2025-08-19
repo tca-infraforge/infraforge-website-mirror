@@ -1,0 +1,35 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "amplify:StartDeployment",
+        "amplify:GetApp",
+        "amplify:GetBranch",
+        "amplify:ListApps",
+        "amplify:ListBranches",
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket",
+        "cloudfront:CreateInvalidation",
+        "cloudfront:GetDistribution",
+        "lambda:InvokeFunction",
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "iam:PassRole"
+      ],
+      "Resource": [
+        // These placeholders are set by Terraform variables using the infraforge prefix
+        "arn:aws:amplify:us-east-1:940482412089:apps/<AMPLIFY_APP_ID>/*", // var.config.amplify_app_id
+        "arn:aws:s3:::<STATE_BUCKET>", // var.config.tf_state_bucket
+        "arn:aws:s3:::<STATE_BUCKET>/*", // var.config.tf_state_bucket
+        "arn:aws:cloudfront::940482412089:distribution/<CLOUDFRONT_DIST_ID>", // var.config.cloudfront_distribution_id
+        "arn:aws:lambda:us-east-1:940482412089:function:<LAMBDA_FUNCTION_NAME>", // var.config.lambda_name
+        "arn:aws:logs:us-east-1:940482412089:log-group:/aws/lambda/<LAMBDA_FUNCTION_NAME>:*", // var.config.lambda_name
+        "arn:aws:iam::940482412089:role/<ROLE_NAME>" // var.config.lambda_exec_role_name
+      ]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+# Main repository: https://github.com/temitayocharles/infraforge-website.git
+# Mirror repository: https://github.com/tca-infraforge/infraforge-website-mirror.git
+# Terraform Backend Configuration
+# Generated on Tue Aug  5 03:28:26 EDT 2025
+
+BUCKET_NAME=infraforge-tf-state-1754378870
+DYNAMODB_TABLE=infraforge-tf-state-lock-1754378870
+REGION=us-east-1
+
+# Backend block for terraform files:
+terraform {
+  backend "s3" {
+    bucket         = "infraforge-tf-state-1754378870"
+    key            = "infraforge/amplify-website/envs/sandbox/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "infraforge-tf-state-lock-1754378870"
+    encrypt        = true
+  }
+}

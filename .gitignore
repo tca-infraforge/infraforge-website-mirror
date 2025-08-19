@@ -1,0 +1,71 @@
+# Terraform artifacts
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+crash.log
+*.tfplan
+
+# Terraform overrides
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Vault + SOPS + secrets
+*.sops.yaml
+*.sops.json
+*.enc
+secrets.auto.tfvars
+*.auto.tfvars.json
+*.env
+*.pem
+*.key
+*.crt
+vault-agent*
+
+# AWS and provider files
+.aws/
+*.tfvars
+*.tfvars.json
+
+# CI/CD generated
+build/
+dist/
+coverage/
+output/
+logs/
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.bak
+*.tmp
+
+# Node/NPM if present
+node_modules/
+
+# Python if used in automation
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Docker artifacts
+*.tar
+*.img
+*.pid
+
+# Lock files and misc
+.lockfile
+*.lock
+<<<<<<< HEAD
+=======
+
+.git
+
+ci-policy.hcl
+>>>>>>> 6f4adaacb8e119ba377fa6277c2333db3fd72bf9

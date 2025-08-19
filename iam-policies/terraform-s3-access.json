@@ -1,0 +1,43 @@
+// Main repository: https://github.com/temitayocharles/infraforge-website.git
+// Mirror repository: https://github.com/tca-infraforge/infraforge-website-mirror.git
+data "aws_caller_identity" "current" {}
+
+resource "aws_iam_policy" "terraform_backend_locking_policy" {
+  name        = "TerraformS3DynamoDBLockingPolicy"
+  description = "Supports backend state ops with DynamoDB locking and S3 object lock fallback"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid    = "S3TerraformAmplifyEnvAccess",
+        Effect = "Allow",
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket",
+          "s3:GetObjectVersion",
+          "s3:PutObjectRetention",
+          "s3:GetObjectRetention"
+        ],
+        Resource = [
+          "arn:aws:s3:::development-infraforge-sandbox-tf-state",
+          "arn:aws:s3:::development-infraforge-sandbox-tf-state/infraforge/amplify-website/envs/sandbox/*"
+        ]
+      },
+      {
+        Sid    = "DynamoDBTerraformLocking",
+        Effect = "Allow",
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Scan",
+          "dynamodb:Query"
+        ],
+        Resource = "arn:aws:dynamodb:us-east-1:${data.aws_caller_identity.current.account_id}:table/development-infraforge-sandbox-tf-lock"
+      }
+    ]
+  })
+}

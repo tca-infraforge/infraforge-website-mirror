@@ -1,0 +1,12 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "${var.config.iam_trust_user_arn}" // Set via .tfvars
+      },
+      "Action": "sts:AssumeRole",
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+.App {
+  min-height: 100vh;
+  background-color: #f8f9fa;
+  padding: 20px;
+}
+
+h1 {
+  color: #007bff;
+}

@@ -1,0 +1,266 @@
+on:
+  push:
+    branches:
+      - "*"
+  pull_request:
+    branches:
+      - "*"
+
+env:
+  INFRA_REPO: temitayocharles/infraforge-website
+  WEBSITE_REPO: temitayocharles/infraforge-website
+  MIRROR_REPO: https://github.com/tca-infraforge/infraforge-website-mirror.git
+  WEBSITE_DIR: infraforge-website
+  CONFIG_PATH: examples/simple/config.auto.tfvars.json
+  S3_BUCKET: infraforge-tf-state
+  AWS_REGION: us-east-1
+  CI_BOT_EMAIL: ci-bot@infraforge.com
+  CI_BOT_NAME: infraforge-ci-bot
+  MATTERMOST_WEBHOOK_URL: not-set
+
+jobs:
+  lint-test:
+    runs-on: self-hosted
+    env:
+      LINT_LOG: lint-job.log
+      TEST_LOG: test-job.log
+    steps:
+      # Checkout code for linting and testing
+      - name: Checkout Infra Repo
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ env.INFRA_REPO }}
+
+      # Lint Terraform using tflint container (warnings non-blocking)
+      - name: Lint Terraform (tflint)
+        continue-on-error: true
+        run: |
+          set -eo pipefail
+          echo -e "\033[44m\033[97m[TFLINT]\033[0m \033[34m== Running tflint... ==\033[0m" | tee -a $LINT_LOG
+          docker run --rm -v $PWD:/data -w /data ghcr.io/terraform-linters/tflint:latest --filter . | awk '{print "\033[36m" $0 "\033[0m"}' | tee -a $LINT_LOG || true
+
+      # Scan IaC with Checkov container (warnings non-blocking)
+      - name: IaC Scan with Checkov
+        continue-on-error: true
+        run: |
+          set -eo pipefail
+          echo -e "\033[43m\033[30m[CHECKOV]\033[0m \033[33m== Running Checkov... ==\033[0m" | tee -a $LINT_LOG
+          docker run --rm -v $PWD:/data bridgecrew/checkov:latest -d /data | awk '{print "\033[33m" $0 "\033[0m"}' | tee -a $LINT_LOG || true
+
+      # Lint YAML files using yamllint container (warnings non-blocking)
+      - name: Lint YAML (yamllint)
+        continue-on-error: true
+        run: |
+          set -eo pipefail
+          echo -e "\033[46m\033[30m[YAMLLINT]\033[0m \033[36m== Running yamllint... ==\033[0m" | tee -a $LINT_LOG
+          docker run --rm -v $PWD:/data cytopia/yamllint /data | awk '{print "\033[36m" $0 "\033[0m"}' | tee -a $LINT_LOG || true
+
+      # Lint React app using Node.js container (warnings non-blocking)
+      - name: Lint React App (eslint)
+        continue-on-error: true
+        run: |
+          set -eo pipefail
+          echo -e "\033[45m\033[97m[ESLINT]\033[0m \033[35m== Running ESLint... ==\033[0m" | tee -a $LINT_LOG
+          docker run --rm -v $PWD:/data -w /data node:20 bash -c "npm ci && npm run lint" | awk '{print "\033[35m" $0 "\033[0m"}' | tee -a $LINT_LOG || true
+
+      # Run React tests using Node.js container (fail on test errors)
+      - name: Test React App
+        run: |
+          set -eo pipefail
+          echo -e "\033[42m\033[30m[NPM TEST]\033[0m \033[32m== Running React tests... ==\033[0m" | tee -a $TEST_LOG
+          docker run --rm -v $PWD:/data -w /data node:20 bash -c "cd $WEBSITE_DIR && npm ci && npm test -- --coverage" | awk '{print "\033[32m" $0 "\033[0m"}' | tee -a $TEST_LOG
+
+      # Upload lint log for auditing
+      - name: Upload Lint Log
+        uses: actions/upload-artifact@v3
+        with:
+          name: lint-job-log
+          path: ${{ env.LINT_LOG }}
+
+      # Upload test log for auditing
+      - name: Upload Test Log
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-job-log
+          path: ${{ env.TEST_LOG }}
+
+      # Upload coverage report for tracking
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: react-test-coverage
+          path: ${{ env.WEBSITE_DIR }}/coverage/
+
+  build:
+    runs-on: self-hosted
+    needs: [lint-test]
+    env:
+      BUILD_LOG: build-job.log
+    steps:
+      # Checkout code for build
+      - name: Checkout Website Repo
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ env.WEBSITE_REPO }}
+
+      # Check for required dependencies before build
+      - name: Dependency Check
+        run: |
+          set -eo pipefail
+          echo -e "\033[41m\033[97m[DEPENDENCY CHECK]\033[0m \033[31m== Checking for required dependencies... ==\033[0m"
+          cd $WEBSITE_DIR
+          bash dependency-check.sh
+          cd ..
+
+      # Build React app using Node.js container (fail on build errors)
+      - name: Build React App
+        run: |
+          set -eo pipefail
+          echo -e "\033[42m\033[30m[NPM BUILD]\033[0m \033[32m== Building React app... ==\033[0m" | tee -a $BUILD_LOG
+          docker run --rm -v "$PWD/$WEBSITE_DIR":/data -w /data node:20 bash -c "npm ci && npm run build" | awk '{print "\033[32m" $0 "\033[0m"}' | tee -a $BUILD_LOG
+
+      # Scan build output with Trivy container (warnings non-blocking)
+      - name: Trivy Scan (NPM/React)
+        continue-on-error: true
+        run: |
+          set -eo pipefail
+          echo -e "\033[41m\033[97m[TRIVY]\033[0m \033[31m== Scanning with Trivy... ==\033[0m" | tee -a $BUILD_LOG
+          docker run --rm -v $PWD:/data aquasec/trivy fs --scanners vuln,secret,license /data | awk '{print "\033[31m" $0 "\033[0m"}' | tee -a $BUILD_LOG || true
+
+      # Upload build log for auditing
+      - name: Upload Build Log
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-job-log
+          path: ${{ env.BUILD_LOG }}
+
+  deploy:
+    runs-on: self-hosted
+    needs: [build]
+    env:
+      CONFIG_PATH: ${{ env.CONFIG_PATH }}
+      DEPLOY_LOG: deploy-job.log
+      S3_BUCKET: ${{ env.S3_BUCKET }}
+    steps:
+      # Configure AWS credentials via OIDC before any AWS or Terraform commands
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: "infraforge-ci-cd"
+      # Configure AWS credentials via OIDC
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: "infraforge-ci-cd"
+      # Checkout code for deployment
+      - name: Checkout Infra Repo
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ env.INFRA_REPO }}
+
+      - name: Checkout Website Repo
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ env.WEBSITE_REPO }}
+
+      # Terraform plan using container (PR only, warnings non-blocking)
+      - name: Terraform Plan (PR)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          set -eo pipefail
+          echo -e "\033[44m\033[97m[TERRAFORM PLAN]\033[0m \033[34m== Planning Terraform... ==\033[0m" | tee -a $DEPLOY_LOG
+          docker run --rm -v $PWD:/data -w /data hashicorp/terraform:light init | awk '{print "\033[34m" $0 "\033[0m"}' | tee -a $DEPLOY_LOG
+          docker run --rm -v $PWD:/data -w /data hashicorp/terraform:light plan -var-file=$(basename "$CONFIG_PATH") | awk '{print "\033[34m" $0 "\033[0m"}' | tee -a $DEPLOY_LOG
+
+      # AWS identity test using container (non-PR, warnings non-blocking)
+      - name: AWS Identity Test
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        run: |
+          set -eo pipefail
+          echo -e "\033[46m\033[30m[AWS IDENTITY]\033[0m \033[36m== Checking AWS identity... ==\033[0m" | tee -a $DEPLOY_LOG
+          docker run --rm -v $PWD:/data amazon/aws-cli sts get-caller-identity --region $AWS_REGION 2>&1 | awk '{print "\033[36m" $0 "\033[0m"}' | tee -a $DEPLOY_LOG
+
+      # Terraform apply using container (non-PR, fail on errors)
+      - name: Terraform Apply (Push/Merge Only)
+        if: github.event_name != 'pull_request'
+        run: |
+          set -eo pipefail
+          echo -e "\033[42m\033[30m[TERRAFORM APPLY]\033[0m \033[32m== Applying Terraform... ==\033[0m" | tee -a $DEPLOY_LOG
+          docker run --rm -v $PWD:/data -w /data hashicorp/terraform:light init 2>&1 | awk '{print "\033[32m" $0 "\033[0m"}' | tee -a $DEPLOY_LOG
+          docker run --rm -v $PWD:/data -w /data hashicorp/terraform:light apply -auto-approve -input=false -no-color -var-file=$(basename "$CONFIG_PATH") 2>&1 | awk '{print "\033[32m" $0 "\033[0m"}' | tee -a $DEPLOY_LOG
+
+      # Build React app for deployment using container (fail on errors)
+      - name: Build React App
+        if: github.event_name != 'pull_request'
+        run: |
+          set -eo pipefail
+          echo -e "\033[45m\033[97m[NPM BUILD]\033[0m \033[35m== Building React app for deploy... ==\033[0m" | tee -a $DEPLOY_LOG
+          if [ -f "package.json" ]; then
+            docker run --rm -v $PWD:/data -w /data node:20 bash -c "npm ci && npm run build" | awk '{print "\033[35m" $0 "\033[0m"}' | tee -a $DEPLOY_LOG
+          elif [ -f "$WEBSITE_DIR/package.json" ]; then
+            cd $WEBSITE_DIR
+            docker run --rm -v $PWD/$WEBSITE_DIR:/data -w /data node:20 bash -c "npm ci && npm run build" | awk '{print "\033[35m" $0 "\033[0m"}' | tee -a ../$DEPLOY_LOG
+            cd ..
+          else
+            echo -e "\033[41m\033[97m[ERROR]\033[0m \033[31mNo package.json found - checking for existing build directory\033[0m" | tee -a $DEPLOY_LOG
+            ls -la | tee -a $DEPLOY_LOG
+          fi
+
+      # Validate React build output for Amplify (fail on errors)
+      - name: Validate React Build Output for Amplify
+        if: github.event_name != 'pull_request'
+        run: |
+          set -eo pipefail
+          echo -e "\033[44m\033[97m[AMPLIFY VALIDATION]\033[0m \033[34m== Validating React build output... ==\033[0m" | tee -a $DEPLOY_LOG
+          if [ -d "$WEBSITE_DIR/build" ] && [ -f "$WEBSITE_DIR/build/index.html" ]; then
+            echo -e "\033[42m\033[30m[SUCCESS]\033[0m \033[32mBuild output found and valid for Amplify deployment.\033[0m" | tee -a $DEPLOY_LOG
+          else
+            echo -e "\033[41m\033[97m[ERROR]\033[0m \033[31mReact build output missing or invalid! Amplify deployment will fail.\033[0m" | tee -a $DEPLOY_LOG
+            exit 1
+          fi
+
+      # Notify Mattermost on job status (warnings non-blocking)
+      - name: Notify Mattermost
+        if: always() && github.event_name != 'pull_request'
+        continue-on-error: true
+        run: |
+          set -eo pipefail
+          echo -e "\033[46m\033[30m[MATTERMOST]\033[0m \033[36m== Sending notification... ==\033[0m" | tee -a $DEPLOY_LOG
+          STATUS="${{ job.status }}"
+          if [ -n "$MATTERMOST_WEBHOOK_URL" ] && [ "$MATTERMOST_WEBHOOK_URL" != "not-set" ]; then
+            echo -e "\033[42m\033[30m[SUCCESS]\033[0m \033[32mSending Mattermost notification...\033[0m" | tee -a $DEPLOY_LOG
+            curl -X POST -H 'Content-Type: application/json' -d "{\"text\": \"🚀 CI Pipeline *$STATUS* for Amplify App - `$WEBSITE_REPO@$GITHUB_REF_NAME` (mirrored: $MIRROR_REPO)\"}" "$MATTERMOST_WEBHOOK_URL" 2>&1 | tee -a $DEPLOY_LOG
+          else
+            echo -e "\033[43m\033[30m[WARNING]\033[0m \033[33mMattermost webhook URL not configured - skipping notification\033[0m" | tee -a $DEPLOY_LOG
+          fi
+
+      # Show deploy job log for auditing
+      - name: Show Deploy Job Log
+        run: cat $DEPLOY_LOG
+
+      # Upload deploy job log for auditing
+      - name: Upload Deploy Job Log
+        uses: actions/upload-artifact@v3
+        with:
+          name: deploy-job-log
+          path: ${{ env.DEPLOY_LOG }}
+
+      # Mirror repo after successful deploy
+      - name: Mirror to Mirror Repo
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -eo pipefail
+          echo -e "\033[44m\033[97m[MIRROR]\033[0m \033[34m== Mirroring to $MIRROR_REPO... ==\033[0m"
+          git config --global user.email "$CI_BOT_EMAIL"
+          git config --global user.name "$CI_BOT_NAME"
+          git remote add mirror "$MIRROR_REPO" || true
+          git fetch origin
+          git push mirror HEAD:main --force
