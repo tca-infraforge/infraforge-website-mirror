@@ -29,6 +29,7 @@ vault-agent*
 *.tfvars
 *.tfvars.json
 
+
 # CI/CD generated
 build/
 dist/
@@ -36,6 +37,12 @@ coverage/
 output/
 logs/
 *.log
+
+# React app build and dependencies (infraforge-website/infraforge-website)
+infraforge-website/build/
+infraforge-website/node_modules/
+infraforge-website/package-lock.json
+
 
 # System files
 .DS_Store
@@ -62,10 +69,7 @@ __pycache__/
 # Lock files and misc
 .lockfile
 *.lock
-<<<<<<< HEAD
-=======
 
 .git
 
 ci-policy.hcl
->>>>>>> 6f4adaacb8e119ba377fa6277c2333db3fd72bf9

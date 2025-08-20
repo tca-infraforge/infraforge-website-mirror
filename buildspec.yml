@@ -3,9 +3,11 @@ frontend:
   phases:
     preBuild:
       commands:
+        - cd infraforge-website
         - npm ci
     build:
       commands:
+        - cd infraforge-website
         - npm run build
   artifacts:
     baseDirectory: infraforge-website/build
@@ -13,4 +15,4 @@ frontend:
       - "**/*"
   cache:
     paths:
-      - node_modules/**/*
+      - infraforge-website/node_modules/**/*
