@@ -1,18 +1,17 @@
 version: 1.0
 frontend:
+  appRoot: infraforge-website
   phases:
     preBuild:
       commands:
-        - cd infraforge-website
         - npm ci
     build:
       commands:
-        - cd infraforge-website
         - npm run build
   artifacts:
-    baseDirectory: infraforge-website/build
+    baseDirectory: build
     files:
       - "**/*"
   cache:
     paths:
-      - infraforge-website/node_modules/**/*
+      - node_modules/**/*
